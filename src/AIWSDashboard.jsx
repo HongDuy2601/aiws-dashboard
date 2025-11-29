@@ -1,8 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import * as XLSX from 'xlsx';
 
-// Sample data for AI Workforce Solutions
-const employeesData = [
+// ============================================
+// DATA - Sau này sẽ thay bằng fetch từ database
+// ============================================
+const initialEmployees = [
   { id: 1, name: 'Nguyễn Văn An', role: 'Giảng viên', department: 'AI Training', status: 'active', workload: 85, courses: 3, performance: 92, salary: 25000000 },
   { id: 2, name: 'Trần Thị Bình', role: 'Giảng viên', department: 'Digital Marketing', status: 'active', workload: 70, courses: 2, performance: 88, salary: 22000000 },
   { id: 3, name: 'Lê Hoàng Cường', role: 'Business Dev', department: 'Sales', status: 'active', workload: 90, courses: 0, performance: 95, salary: 30000000 },
@@ -11,7 +14,7 @@ const employeesData = [
   { id: 6, name: 'Hoàng Văn Phúc', role: 'Giảng viên', department: 'AI Training', status: 'on-leave', workload: 0, courses: 1, performance: 87, salary: 23000000 },
 ];
 
-const coursesData = [
+const initialCourses = [
   { id: 1, name: 'AI Fundamentals cho Doanh nghiệp', instructor: 'Nguyễn Văn An', students: 45, progress: 75, status: 'active', revenue: 135000000, startDate: '2025-01-15', endDate: '2025-03-15', category: 'AI Training' },
   { id: 2, name: 'Digital Marketing Masterclass', instructor: 'Trần Thị Bình', students: 38, progress: 60, status: 'active', revenue: 95000000, startDate: '2025-02-01', endDate: '2025-04-01', category: 'Digital Marketing' },
   { id: 3, name: 'E-commerce Strategy', instructor: 'Phạm Minh Dũng', students: 52, progress: 90, status: 'active', revenue: 156000000, startDate: '2024-12-01', endDate: '2025-02-28', category: 'E-commerce' },
@@ -20,13 +23,13 @@ const coursesData = [
   { id: 6, name: 'AI Automation Workshop', instructor: 'Hoàng Văn Phúc', students: 30, progress: 20, status: 'upcoming', revenue: 90000000, startDate: '2025-03-01', endDate: '2025-04-30', category: 'AI Training' },
 ];
 
-const leadsData = [
-  { id: 1, company: 'Công ty Dược phẩm ABC', contact: 'Nguyễn Văn X', value: 500000000, stage: 'negotiation', probability: 75, source: 'Referral', createdAt: '2025-01-10' },
-  { id: 2, company: 'Tập đoàn Thủy sản XYZ', contact: 'Trần Thị Y', value: 350000000, stage: 'proposal', probability: 60, source: 'Website', createdAt: '2025-01-15' },
-  { id: 3, company: 'Ngân hàng VN Bank', contact: 'Lê Văn Z', value: 800000000, stage: 'qualification', probability: 40, source: 'Event', createdAt: '2025-01-20' },
-  { id: 4, company: 'FPT Software', contact: 'Phạm Văn W', value: 450000000, stage: 'closed-won', probability: 100, source: 'LinkedIn', createdAt: '2024-12-01' },
-  { id: 5, company: 'Vingroup Education', contact: 'Hoàng Thị V', value: 650000000, stage: 'negotiation', probability: 70, source: 'Referral', createdAt: '2025-01-25' },
-  { id: 6, company: 'Techcombank', contact: 'Võ Văn U', value: 300000000, stage: 'discovery', probability: 25, source: 'Cold Call', createdAt: '2025-02-01' },
+const initialLeads = [
+  { id: 1, company: 'Công ty Dược phẩm ABC', contact: 'Nguyễn Văn X', email: 'nguyenx@abc.com', phone: '0901234567', value: 500000000, stage: 'negotiation', probability: 75, source: 'Referral', createdAt: '2025-01-10', notes: 'Quan tâm đào tạo AI cho sales team' },
+  { id: 2, company: 'Tập đoàn Thủy sản XYZ', contact: 'Trần Thị Y', email: 'trany@xyz.com', phone: '0912345678', value: 350000000, stage: 'proposal', probability: 60, source: 'Website', createdAt: '2025-01-15', notes: 'Cần chatbot cho CSKH' },
+  { id: 3, company: 'Ngân hàng VN Bank', contact: 'Lê Văn Z', email: 'lez@vnbank.com', phone: '0923456789', value: 800000000, stage: 'qualification', probability: 40, source: 'Event', createdAt: '2025-01-20', notes: 'Gặp tại Tech Summit 2025' },
+  { id: 4, company: 'FPT Software', contact: 'Phạm Văn W', email: 'phamw@fpt.com', phone: '0934567890', value: 450000000, stage: 'closed-won', probability: 100, source: 'LinkedIn', createdAt: '2024-12-01', notes: 'Đã ký hợp đồng' },
+  { id: 5, company: 'Vingroup Education', contact: 'Hoàng Thị V', email: 'hoangv@vingroup.com', phone: '0945678901', value: 650000000, stage: 'negotiation', probability: 70, source: 'Referral', createdAt: '2025-01-25', notes: 'Đang thương thảo giá' },
+  { id: 6, company: 'Techcombank', contact: 'Võ Văn U', email: 'vou@techcombank.com', phone: '0956789012', value: 300000000, stage: 'discovery', probability: 25, source: 'Cold Call', createdAt: '2025-02-01', notes: 'Mới liên hệ lần đầu' },
 ];
 
 const financialData = [
@@ -54,11 +57,145 @@ const pipelineStages = [
   { name: 'Closed Won', value: 5, deals: 1, amount: 450 },
 ];
 
+// ============================================
+// MODAL COMPONENT
+// ============================================
+const Modal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px'
+    }} onClick={onClose}>
+      <div style={{
+        background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+        borderRadius: '16px',
+        padding: '24px',
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        border: '1px solid rgba(148, 163, 184, 0.2)'
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>{title}</h2>
+          <button onClick={onClose} style={{
+            background: 'none',
+            border: 'none',
+            color: '#94A3B8',
+            fontSize: '24px',
+            cursor: 'pointer',
+            padding: '4px'
+          }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// FORM INPUT COMPONENT
+// ============================================
+const FormInput = ({ label, type = 'text', value, onChange, options, required, placeholder }) => (
+  <div style={{ marginBottom: '16px' }}>
+    <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94A3B8' }}>
+      {label} {required && <span style={{ color: '#EF4444' }}>*</span>}
+    </label>
+    {type === 'select' ? (
+      <select
+        value={value}
+        onChange={onChange}
+        required={required}
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          background: 'rgba(30, 41, 59, 0.8)',
+          border: '1px solid rgba(148, 163, 184, 0.2)',
+          borderRadius: '8px',
+          color: '#F1F5F9',
+          fontSize: '14px',
+          outline: 'none'
+        }}
+      >
+        <option value="">Chọn...</option>
+        {options?.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    ) : type === 'textarea' ? (
+      <textarea
+        value={value}
+        onChange={onChange}
+        required={required}
+        placeholder={placeholder}
+        rows={3}
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          background: 'rgba(30, 41, 59, 0.8)',
+          border: '1px solid rgba(148, 163, 184, 0.2)',
+          borderRadius: '8px',
+          color: '#F1F5F9',
+          fontSize: '14px',
+          outline: 'none',
+          resize: 'vertical'
+        }}
+      />
+    ) : (
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        required={required}
+        placeholder={placeholder}
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          background: 'rgba(30, 41, 59, 0.8)',
+          border: '1px solid rgba(148, 163, 184, 0.2)',
+          borderRadius: '8px',
+          color: '#F1F5F9',
+          fontSize: '14px',
+          outline: 'none'
+        }}
+      />
+    )}
+  </div>
+);
+
+// ============================================
+// MAIN DASHBOARD COMPONENT
+// ============================================
 export default function AIWSDashboard() {
+  // State for data
+  const [employees, setEmployees] = useState(initialEmployees);
+  const [courses, setCourses] = useState(initialCourses);
+  const [leads, setLeads] = useState(initialLeads);
+  
+  // UI State
   const [activeTab, setActiveTab] = useState('overview');
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterStage, setFilterStage] = useState('all');
   const [filterCourseStatus, setFilterCourseStatus] = useState('all');
+  
+  // Modal State
+  const [modalType, setModalType] = useState(null); // 'employee', 'course', 'lead'
+  const [editingItem, setEditingItem] = useState(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  
+  // Form State
+  const [formData, setFormData] = useState({});
 
   const COLORS = ['#0D9488', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899', '#10B981'];
   const STAGE_COLORS = {
@@ -70,46 +207,205 @@ export default function AIWSDashboard() {
     'closed-lost': '#EF4444'
   };
 
-  // Calculate KPIs
+  // ============================================
+  // EXPORT FUNCTIONS
+  // ============================================
+  const exportToExcel = (type) => {
+    let data, fileName;
+    
+    switch(type) {
+      case 'employees':
+        data = employees.map(e => ({
+          'Họ tên': e.name,
+          'Chức vụ': e.role,
+          'Phòng ban': e.department,
+          'Trạng thái': e.status === 'active' ? 'Đang làm' : 'Nghỉ phép',
+          'Workload (%)': e.workload,
+          'Số khóa dạy': e.courses,
+          'Performance (%)': e.performance,
+          'Lương (VNĐ)': e.salary
+        }));
+        fileName = 'AIWS_NhanSu';
+        break;
+      case 'courses':
+        data = courses.map(c => ({
+          'Tên khóa học': c.name,
+          'Giảng viên': c.instructor,
+          'Số học viên': c.students,
+          'Tiến độ (%)': c.progress,
+          'Trạng thái': c.status === 'active' ? 'Đang diễn ra' : c.status === 'upcoming' ? 'Sắp tới' : 'Hoàn thành',
+          'Doanh thu (VNĐ)': c.revenue,
+          'Ngày bắt đầu': c.startDate,
+          'Ngày kết thúc': c.endDate,
+          'Danh mục': c.category
+        }));
+        fileName = 'AIWS_KhoaHoc';
+        break;
+      case 'leads':
+        data = leads.map(l => ({
+          'Công ty': l.company,
+          'Người liên hệ': l.contact,
+          'Email': l.email,
+          'Điện thoại': l.phone,
+          'Giá trị (VNĐ)': l.value,
+          'Giai đoạn': getStageLabel(l.stage),
+          'Xác suất (%)': l.probability,
+          'Nguồn': l.source,
+          'Ngày tạo': l.createdAt,
+          'Ghi chú': l.notes
+        }));
+        fileName = 'AIWS_Leads';
+        break;
+      case 'finance':
+        data = [...financialData, ...forecastData].map(f => ({
+          'Tháng': f.month,
+          'Doanh thu (Triệu)': f.revenue,
+          'Chi phí (Triệu)': f.expenses,
+          'Lợi nhuận (Triệu)': f.profit,
+          'Loại': f.type === 'forecast' ? 'Dự báo' : 'Thực tế'
+        }));
+        fileName = 'AIWS_TaiChinh';
+        break;
+      case 'all':
+        // Create workbook with multiple sheets
+        const wb = XLSX.utils.book_new();
+        
+        const empSheet = XLSX.utils.json_to_sheet(employees.map(e => ({
+          'Họ tên': e.name, 'Chức vụ': e.role, 'Phòng ban': e.department,
+          'Trạng thái': e.status === 'active' ? 'Đang làm' : 'Nghỉ phép',
+          'Workload (%)': e.workload, 'Performance (%)': e.performance, 'Lương (VNĐ)': e.salary
+        })));
+        XLSX.utils.book_append_sheet(wb, empSheet, 'Nhân sự');
+        
+        const courseSheet = XLSX.utils.json_to_sheet(courses.map(c => ({
+          'Tên khóa học': c.name, 'Giảng viên': c.instructor, 'Số học viên': c.students,
+          'Tiến độ (%)': c.progress, 'Doanh thu (VNĐ)': c.revenue, 'Danh mục': c.category
+        })));
+        XLSX.utils.book_append_sheet(wb, courseSheet, 'Khóa học');
+        
+        const leadsSheet = XLSX.utils.json_to_sheet(leads.map(l => ({
+          'Công ty': l.company, 'Người liên hệ': l.contact, 'Email': l.email,
+          'Giá trị (VNĐ)': l.value, 'Giai đoạn': getStageLabel(l.stage), 'Xác suất (%)': l.probability
+        })));
+        XLSX.utils.book_append_sheet(wb, leadsSheet, 'Leads');
+        
+        const financeSheet = XLSX.utils.json_to_sheet([...financialData, ...forecastData].map(f => ({
+          'Tháng': f.month, 'Doanh thu': f.revenue, 'Chi phí': f.expenses, 'Lợi nhuận': f.profit
+        })));
+        XLSX.utils.book_append_sheet(wb, financeSheet, 'Tài chính');
+        
+        XLSX.writeFile(wb, `AIWS_BaoCaoTongHop_${new Date().toISOString().split('T')[0]}.xlsx`);
+        setShowExportMenu(false);
+        return;
+      default:
+        return;
+    }
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setShowExportMenu(false);
+  };
+
+  // ============================================
+  // CRUD FUNCTIONS
+  // ============================================
+  const openAddModal = (type) => {
+    setModalType(type);
+    setEditingItem(null);
+    setFormData({});
+  };
+
+  const openEditModal = (type, item) => {
+    setModalType(type);
+    setEditingItem(item);
+    setFormData(item);
+  };
+
+  const closeModal = () => {
+    setModalType(null);
+    setEditingItem(null);
+    setFormData({});
+  };
+
+  const handleSave = () => {
+    if (modalType === 'employee') {
+      if (editingItem) {
+        setEmployees(employees.map(e => e.id === editingItem.id ? { ...formData, id: editingItem.id } : e));
+      } else {
+        setEmployees([...employees, { ...formData, id: Date.now() }]);
+      }
+    } else if (modalType === 'course') {
+      if (editingItem) {
+        setCourses(courses.map(c => c.id === editingItem.id ? { ...formData, id: editingItem.id } : c));
+      } else {
+        setCourses([...courses, { ...formData, id: Date.now() }]);
+      }
+    } else if (modalType === 'lead') {
+      if (editingItem) {
+        setLeads(leads.map(l => l.id === editingItem.id ? { ...formData, id: editingItem.id } : l));
+      } else {
+        setLeads([...leads, { ...formData, id: Date.now(), createdAt: new Date().toISOString().split('T')[0] }]);
+      }
+    }
+    closeModal();
+  };
+
+  const handleDelete = (type, id) => {
+    if (!confirm('Bạn có chắc muốn xóa?')) return;
+    
+    if (type === 'employee') {
+      setEmployees(employees.filter(e => e.id !== id));
+    } else if (type === 'course') {
+      setCourses(courses.filter(c => c.id !== id));
+    } else if (type === 'lead') {
+      setLeads(leads.filter(l => l.id !== id));
+    }
+  };
+
+  // ============================================
+  // CALCULATIONS
+  // ============================================
   const totalRevenue = financialData.reduce((sum, d) => sum + d.revenue, 0);
-  const totalStudents = coursesData.reduce((sum, c) => sum + c.students, 0);
-  const avgCourseProgress = Math.round(coursesData.filter(c => c.status === 'active').reduce((sum, c) => sum + c.progress, 0) / coursesData.filter(c => c.status === 'active').length);
-  const pipelineValue = leadsData.filter(l => l.stage !== 'closed-won' && l.stage !== 'closed-lost').reduce((sum, l) => sum + l.value, 0);
-  const weightedPipeline = leadsData.filter(l => l.stage !== 'closed-won' && l.stage !== 'closed-lost').reduce((sum, l) => sum + (l.value * l.probability / 100), 0);
+  const totalStudents = courses.reduce((sum, c) => sum + c.students, 0);
+  const avgCourseProgress = Math.round(courses.filter(c => c.status === 'active').reduce((sum, c) => sum + c.progress, 0) / courses.filter(c => c.status === 'active').length) || 0;
+  const pipelineValue = leads.filter(l => l.stage !== 'closed-won' && l.stage !== 'closed-lost').reduce((sum, l) => sum + l.value, 0);
+  const weightedPipeline = leads.filter(l => l.stage !== 'closed-won' && l.stage !== 'closed-lost').reduce((sum, l) => sum + (l.value * l.probability / 100), 0);
 
   const filteredEmployees = useMemo(() => {
     return filterDepartment === 'all' 
-      ? employeesData 
-      : employeesData.filter(e => e.department === filterDepartment);
-  }, [filterDepartment]);
+      ? employees 
+      : employees.filter(e => e.department === filterDepartment);
+  }, [filterDepartment, employees]);
 
   const filteredLeads = useMemo(() => {
     return filterStage === 'all'
-      ? leadsData
-      : leadsData.filter(l => l.stage === filterStage);
-  }, [filterStage]);
+      ? leads
+      : leads.filter(l => l.stage === filterStage);
+  }, [filterStage, leads]);
 
   const filteredCourses = useMemo(() => {
     return filterCourseStatus === 'all'
-      ? coursesData
-      : coursesData.filter(c => c.status === filterCourseStatus);
-  }, [filterCourseStatus]);
+      ? courses
+      : courses.filter(c => c.status === filterCourseStatus);
+  }, [filterCourseStatus, courses]);
 
   const departmentDistribution = useMemo(() => {
     const dept = {};
-    employeesData.forEach(e => {
+    employees.forEach(e => {
       dept[e.department] = (dept[e.department] || 0) + 1;
     });
     return Object.entries(dept).map(([name, value]) => ({ name, value }));
-  }, []);
+  }, [employees]);
 
   const coursesByCategory = useMemo(() => {
     const cat = {};
-    coursesData.forEach(c => {
+    courses.forEach(c => {
       cat[c.category] = (cat[c.category] || 0) + c.revenue;
     });
     return Object.entries(cat).map(([name, value]) => ({ name, value: value / 1000000 }));
-  }, []);
+  }, [courses]);
 
   const formatCurrency = (value) => {
     if (value >= 1000000000) return `${(value / 1000000000).toFixed(1)}B`;
@@ -136,6 +432,138 @@ export default function AIWSDashboard() {
     { id: 'finance', label: 'Tài chính', icon: '💰' },
     { id: 'sales', label: 'Sales Pipeline', icon: '🎯' },
   ];
+
+  // ============================================
+  // RENDER FORMS
+  // ============================================
+  const renderEmployeeForm = () => (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormInput label="Họ tên" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} required />
+        <FormInput label="Chức vụ" value={formData.role || ''} onChange={e => setFormData({...formData, role: e.target.value})} required />
+      </div>
+      <FormInput 
+        label="Phòng ban" 
+        type="select" 
+        value={formData.department || ''} 
+        onChange={e => setFormData({...formData, department: e.target.value})}
+        options={[
+          { value: 'AI Training', label: 'AI Training' },
+          { value: 'Digital Marketing', label: 'Digital Marketing' },
+          { value: 'E-commerce', label: 'E-commerce' },
+          { value: 'Sales', label: 'Sales' },
+          { value: 'Operations', label: 'Operations' },
+        ]}
+        required
+      />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormInput 
+          label="Trạng thái" 
+          type="select" 
+          value={formData.status || 'active'} 
+          onChange={e => setFormData({...formData, status: e.target.value})}
+          options={[
+            { value: 'active', label: 'Đang làm' },
+            { value: 'on-leave', label: 'Nghỉ phép' },
+          ]}
+        />
+        <FormInput label="Lương (VNĐ)" type="number" value={formData.salary || ''} onChange={e => setFormData({...formData, salary: parseInt(e.target.value) || 0})} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+        <FormInput label="Workload (%)" type="number" value={formData.workload || ''} onChange={e => setFormData({...formData, workload: parseInt(e.target.value) || 0})} />
+        <FormInput label="Số khóa dạy" type="number" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: parseInt(e.target.value) || 0})} />
+        <FormInput label="Performance (%)" type="number" value={formData.performance || ''} onChange={e => setFormData({...formData, performance: parseInt(e.target.value) || 0})} />
+      </div>
+    </>
+  );
+
+  const renderCourseForm = () => (
+    <>
+      <FormInput label="Tên khóa học" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} required />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormInput label="Giảng viên" value={formData.instructor || ''} onChange={e => setFormData({...formData, instructor: e.target.value})} required />
+        <FormInput 
+          label="Danh mục" 
+          type="select" 
+          value={formData.category || ''} 
+          onChange={e => setFormData({...formData, category: e.target.value})}
+          options={[
+            { value: 'AI Training', label: 'AI Training' },
+            { value: 'Digital Marketing', label: 'Digital Marketing' },
+            { value: 'E-commerce', label: 'E-commerce' },
+          ]}
+          required
+        />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormInput label="Ngày bắt đầu" type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} required />
+        <FormInput label="Ngày kết thúc" type="date" value={formData.endDate || ''} onChange={e => setFormData({...formData, endDate: e.target.value})} required />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+        <FormInput label="Số học viên" type="number" value={formData.students || ''} onChange={e => setFormData({...formData, students: parseInt(e.target.value) || 0})} />
+        <FormInput label="Tiến độ (%)" type="number" value={formData.progress || ''} onChange={e => setFormData({...formData, progress: parseInt(e.target.value) || 0})} />
+        <FormInput label="Doanh thu (VNĐ)" type="number" value={formData.revenue || ''} onChange={e => setFormData({...formData, revenue: parseInt(e.target.value) || 0})} />
+      </div>
+      <FormInput 
+        label="Trạng thái" 
+        type="select" 
+        value={formData.status || 'upcoming'} 
+        onChange={e => setFormData({...formData, status: e.target.value})}
+        options={[
+          { value: 'upcoming', label: 'Sắp tới' },
+          { value: 'active', label: 'Đang diễn ra' },
+          { value: 'completed', label: 'Hoàn thành' },
+        ]}
+      />
+    </>
+  );
+
+  const renderLeadForm = () => (
+    <>
+      <FormInput label="Tên công ty" value={formData.company || ''} onChange={e => setFormData({...formData, company: e.target.value})} required />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormInput label="Người liên hệ" value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} required />
+        <FormInput label="Email" type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormInput label="Điện thoại" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
+        <FormInput label="Giá trị deal (VNĐ)" type="number" value={formData.value || ''} onChange={e => setFormData({...formData, value: parseInt(e.target.value) || 0})} required />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormInput 
+          label="Giai đoạn" 
+          type="select" 
+          value={formData.stage || 'discovery'} 
+          onChange={e => setFormData({...formData, stage: e.target.value})}
+          options={[
+            { value: 'discovery', label: 'Khám phá' },
+            { value: 'qualification', label: 'Đánh giá' },
+            { value: 'proposal', label: 'Đề xuất' },
+            { value: 'negotiation', label: 'Đàm phán' },
+            { value: 'closed-won', label: 'Thành công' },
+            { value: 'closed-lost', label: 'Thất bại' },
+          ]}
+          required
+        />
+        <FormInput label="Xác suất (%)" type="number" value={formData.probability || ''} onChange={e => setFormData({...formData, probability: parseInt(e.target.value) || 0})} />
+      </div>
+      <FormInput 
+        label="Nguồn" 
+        type="select" 
+        value={formData.source || ''} 
+        onChange={e => setFormData({...formData, source: e.target.value})}
+        options={[
+          { value: 'Website', label: 'Website' },
+          { value: 'Referral', label: 'Giới thiệu' },
+          { value: 'LinkedIn', label: 'LinkedIn' },
+          { value: 'Event', label: 'Sự kiện' },
+          { value: 'Cold Call', label: 'Cold Call' },
+          { value: 'Facebook', label: 'Facebook' },
+        ]}
+      />
+      <FormInput label="Ghi chú" type="textarea" value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Thông tin thêm về lead..." />
+    </>
+  );
 
   return (
     <div style={{
@@ -258,6 +686,30 @@ export default function AIWSDashboard() {
           border-color: #0D9488;
         }
         
+        .action-btn {
+          padding: 6px 12px;
+          border: none;
+          border-radius: 6px;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-family: inherit;
+        }
+        
+        .action-btn:hover {
+          transform: scale(1.05);
+        }
+        
+        .action-btn.edit {
+          background: rgba(59, 130, 246, 0.2);
+          color: #60A5FA;
+        }
+        
+        .action-btn.delete {
+          background: rgba(239, 68, 68, 0.2);
+          color: #EF4444;
+        }
+        
         .gantt-bar {
           height: 28px;
           border-radius: 6px;
@@ -300,6 +752,35 @@ export default function AIWSDashboard() {
         .pipeline-stage:hover {
           transform: scale(1.02);
         }
+        
+        .dropdown-menu {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          margin-top: 8px;
+          background: #1E293B;
+          border: 1px solid rgba(148, 163, 184, 0.2);
+          border-radius: 12px;
+          padding: 8px;
+          min-width: 200px;
+          z-index: 100;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        .dropdown-item {
+          padding: 10px 16px;
+          border-radius: 8px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 14px;
+          transition: background 0.2s;
+        }
+        
+        .dropdown-item:hover {
+          background: rgba(148, 163, 184, 0.1);
+        }
       `}</style>
 
       {/* Header */}
@@ -335,37 +816,74 @@ export default function AIWSDashboard() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{
-            padding: '10px 20px',
-            background: 'rgba(30, 41, 59, 0.8)',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
-            borderRadius: '10px',
-            color: '#F1F5F9',
-            fontFamily: 'inherit',
-            fontSize: '14px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            📥 Xuất báo cáo
-          </button>
-          <button style={{
-            padding: '10px 20px',
-            background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
-            border: 'none',
-            borderRadius: '10px',
-            color: 'white',
-            fontFamily: 'inherit',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            ➕ Thêm mới
-          </button>
+          {/* Export Button with Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              style={{
+                padding: '10px 20px',
+                background: 'rgba(30, 41, 59, 0.8)',
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                borderRadius: '10px',
+                color: '#F1F5F9',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              📥 Xuất báo cáo ▾
+            </button>
+            {showExportMenu && (
+              <div className="dropdown-menu">
+                <div className="dropdown-item" onClick={() => exportToExcel('all')}>
+                  📊 Xuất tất cả (Excel)
+                </div>
+                <div className="dropdown-item" onClick={() => exportToExcel('employees')}>
+                  👥 Xuất Nhân sự
+                </div>
+                <div className="dropdown-item" onClick={() => exportToExcel('courses')}>
+                  📚 Xuất Khóa học
+                </div>
+                <div className="dropdown-item" onClick={() => exportToExcel('leads')}>
+                  🎯 Xuất Leads
+                </div>
+                <div className="dropdown-item" onClick={() => exportToExcel('finance')}>
+                  💰 Xuất Tài chính
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Add New Button */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => {
+                if (activeTab === 'employees') openAddModal('employee');
+                else if (activeTab === 'courses') openAddModal('course');
+                else if (activeTab === 'sales') openAddModal('lead');
+                else openAddModal('lead'); // default
+              }}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+                border: 'none',
+                borderRadius: '10px',
+                color: 'white',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              ➕ Thêm mới
+            </button>
+          </div>
         </div>
       </div>
 
@@ -559,24 +1077,41 @@ export default function AIWSDashboard() {
         <div className="animate-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Quản lý Nhân sự & Giảng viên</h3>
-            <select 
-              className="filter-select"
-              value={filterDepartment}
-              onChange={(e) => setFilterDepartment(e.target.value)}
-            >
-              <option value="all">Tất cả phòng ban</option>
-              <option value="AI Training">AI Training</option>
-              <option value="Digital Marketing">Digital Marketing</option>
-              <option value="E-commerce">E-commerce</option>
-              <option value="Sales">Sales</option>
-              <option value="Operations">Operations</option>
-            </select>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <select 
+                className="filter-select"
+                value={filterDepartment}
+                onChange={(e) => setFilterDepartment(e.target.value)}
+              >
+                <option value="all">Tất cả phòng ban</option>
+                <option value="AI Training">AI Training</option>
+                <option value="Digital Marketing">Digital Marketing</option>
+                <option value="E-commerce">E-commerce</option>
+                <option value="Sales">Sales</option>
+                <option value="Operations">Operations</option>
+              </select>
+              <button 
+                onClick={() => openAddModal('employee')}
+                style={{
+                  padding: '10px 16px',
+                  background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: 'white',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                ➕ Thêm nhân viên
+              </button>
+            </div>
           </div>
 
           <div className="glass-card" style={{ overflow: 'hidden' }}>
             {/* Table Header */}
             <div className="table-row" style={{ 
-              gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr',
+              gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr 120px',
               background: 'rgba(15, 23, 42, 0.5)',
               fontWeight: '600',
               fontSize: '13px',
@@ -590,13 +1125,14 @@ export default function AIWSDashboard() {
               <div>Workload</div>
               <div>Performance</div>
               <div>Lương</div>
+              <div>Thao tác</div>
             </div>
             
             {filteredEmployees.map(emp => (
               <div 
                 key={emp.id} 
                 className="table-row"
-                style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr' }}
+                style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr 120px' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{
@@ -654,6 +1190,10 @@ export default function AIWSDashboard() {
                 <div style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: '500' }}>
                   {(emp.salary / 1000000).toFixed(0)}M
                 </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="action-btn edit" onClick={() => openEditModal('employee', emp)}>✏️ Sửa</button>
+                  <button className="action-btn delete" onClick={() => handleDelete('employee', emp.id)}>🗑️</button>
+                </div>
               </div>
             ))}
           </div>
@@ -662,7 +1202,7 @@ export default function AIWSDashboard() {
           <div className="glass-card" style={{ padding: '24px', marginTop: '20px' }}>
             <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600' }}>Phân bổ Workload</h3>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={employeesData} layout="vertical">
+              <BarChart data={employees} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
                 <XAxis type="number" stroke="#64748B" fontSize={12} domain={[0, 100]} />
                 <YAxis type="category" dataKey="name" stroke="#64748B" fontSize={12} width={120} />
@@ -681,23 +1221,40 @@ export default function AIWSDashboard() {
         <div className="animate-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Quản lý Khóa học</h3>
-            <select 
-              className="filter-select"
-              value={filterCourseStatus}
-              onChange={(e) => setFilterCourseStatus(e.target.value)}
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang diễn ra</option>
-              <option value="upcoming">Sắp tới</option>
-              <option value="completed">Hoàn thành</option>
-            </select>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <select 
+                className="filter-select"
+                value={filterCourseStatus}
+                onChange={(e) => setFilterCourseStatus(e.target.value)}
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Đang diễn ra</option>
+                <option value="upcoming">Sắp tới</option>
+                <option value="completed">Hoàn thành</option>
+              </select>
+              <button 
+                onClick={() => openAddModal('course')}
+                style={{
+                  padding: '10px 16px',
+                  background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: 'white',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                ➕ Thêm khóa học
+              </button>
+            </div>
           </div>
 
           {/* Course Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
               <div style={{ fontSize: '28px', fontWeight: '700', color: '#0D9488', fontFamily: '"Space Grotesk", sans-serif' }}>
-                {coursesData.filter(c => c.status === 'active').length}
+                {courses.filter(c => c.status === 'active').length}
               </div>
               <div style={{ fontSize: '13px', color: '#94A3B8' }}>Khóa học đang chạy</div>
             </div>
@@ -709,13 +1266,13 @@ export default function AIWSDashboard() {
             </div>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
               <div style={{ fontSize: '28px', fontWeight: '700', color: '#F59E0B', fontFamily: '"Space Grotesk", sans-serif' }}>
-                {formatCurrency(coursesData.reduce((sum, c) => sum + c.revenue, 0))}
+                {formatCurrency(courses.reduce((sum, c) => sum + c.revenue, 0))}
               </div>
               <div style={{ fontSize: '13px', color: '#94A3B8' }}>Tổng doanh thu</div>
             </div>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
               <div style={{ fontSize: '28px', fontWeight: '700', color: '#8B5CF6', fontFamily: '"Space Grotesk", sans-serif' }}>
-                {coursesData.filter(c => c.status === 'upcoming').length}
+                {courses.filter(c => c.status === 'upcoming').length}
               </div>
               <div style={{ fontSize: '13px', color: '#94A3B8' }}>Khóa học sắp tới</div>
             </div>
@@ -726,7 +1283,7 @@ export default function AIWSDashboard() {
             {filteredCourses.map((course, index) => (
               <div key={course.id} className="glass-card" style={{ padding: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <span 
                       className="status-badge" 
                       style={{ 
@@ -744,15 +1301,9 @@ export default function AIWSDashboard() {
                     <h4 style={{ margin: '8px 0 4px 0', fontSize: '16px', fontWeight: '600' }}>{course.name}</h4>
                     <p style={{ margin: 0, fontSize: '13px', color: '#94A3B8' }}>👤 {course.instructor}</p>
                   </div>
-                  <div style={{ 
-                    background: `${COLORS[index % COLORS.length]}22`,
-                    color: COLORS[index % COLORS.length],
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '500'
-                  }}>
-                    {course.category}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="action-btn edit" onClick={() => openEditModal('course', course)}>✏️</button>
+                    <button className="action-btn delete" onClick={() => handleDelete('course', course.id)}>🗑️</button>
                   </div>
                 </div>
 
@@ -790,53 +1341,6 @@ export default function AIWSDashboard() {
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* Gantt Chart */}
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600' }}>Timeline Khóa học (Gantt Chart)</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: '800px' }}>
-                {/* Timeline Header */}
-                <div style={{ display: 'flex', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', paddingBottom: '12px', marginBottom: '16px' }}>
-                  <div style={{ width: '200px', fontSize: '13px', color: '#94A3B8' }}>Khóa học</div>
-                  <div style={{ flex: 1, display: 'flex' }}>
-                    {['T10', 'T11', 'T12', 'T1', 'T2', 'T3', 'T4', 'T5'].map(month => (
-                      <div key={month} style={{ flex: 1, textAlign: 'center', fontSize: '12px', color: '#64748B' }}>{month}</div>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Gantt Bars */}
-                {coursesData.map((course, index) => {
-                  const startMonth = parseInt(course.startDate.split('-')[1]);
-                  const endMonth = parseInt(course.endDate.split('-')[1]);
-                  const startOffset = ((startMonth - 10 + 12) % 12) * 12.5;
-                  const duration = ((endMonth - startMonth + 12) % 12 + 1) * 12.5;
-                  
-                  return (
-                    <div key={course.id} style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
-                      <div style={{ width: '200px', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {course.name}
-                      </div>
-                      <div style={{ flex: 1, position: 'relative', height: '32px' }}>
-                        <div 
-                          className="gantt-bar"
-                          style={{
-                            position: 'absolute',
-                            left: `${startOffset}%`,
-                            width: `${Math.min(duration, 100 - startOffset)}%`,
-                            background: `linear-gradient(90deg, ${COLORS[index % COLORS.length]}, ${COLORS[index % COLORS.length]}88)`,
-                          }}
-                        >
-                          {course.progress}%
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -967,18 +1471,35 @@ export default function AIWSDashboard() {
         <div className="animate-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Sales Pipeline - Leads & Deals</h3>
-            <select 
-              className="filter-select"
-              value={filterStage}
-              onChange={(e) => setFilterStage(e.target.value)}
-            >
-              <option value="all">Tất cả giai đoạn</option>
-              <option value="discovery">Khám phá</option>
-              <option value="qualification">Đánh giá</option>
-              <option value="proposal">Đề xuất</option>
-              <option value="negotiation">Đàm phán</option>
-              <option value="closed-won">Thành công</option>
-            </select>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <select 
+                className="filter-select"
+                value={filterStage}
+                onChange={(e) => setFilterStage(e.target.value)}
+              >
+                <option value="all">Tất cả giai đoạn</option>
+                <option value="discovery">Khám phá</option>
+                <option value="qualification">Đánh giá</option>
+                <option value="proposal">Đề xuất</option>
+                <option value="negotiation">Đàm phán</option>
+                <option value="closed-won">Thành công</option>
+              </select>
+              <button 
+                onClick={() => openAddModal('lead')}
+                style={{
+                  padding: '10px 16px',
+                  background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: 'white',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                ➕ Thêm Lead
+              </button>
+            </div>
           </div>
 
           {/* Pipeline Funnel */}
@@ -1014,7 +1535,7 @@ export default function AIWSDashboard() {
           {/* Deals Table */}
           <div className="glass-card" style={{ overflow: 'hidden' }}>
             <div className="table-row" style={{ 
-              gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr',
+              gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr 100px',
               background: 'rgba(15, 23, 42, 0.5)',
               fontWeight: '600',
               fontSize: '13px',
@@ -1028,16 +1549,20 @@ export default function AIWSDashboard() {
               <div>Giai đoạn</div>
               <div>Xác suất</div>
               <div>Nguồn</div>
+              <div>Thao tác</div>
             </div>
             
             {filteredLeads.map(lead => (
               <div 
                 key={lead.id} 
                 className="table-row"
-                style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr' }}
+                style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr 100px' }}
               >
                 <div style={{ fontWeight: '500' }}>{lead.company}</div>
-                <div style={{ color: '#94A3B8' }}>{lead.contact}</div>
+                <div>
+                  <div>{lead.contact}</div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>{lead.email}</div>
+                </div>
                 <div style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: '600', color: '#10B981' }}>
                   {formatCurrency(lead.value)}
                 </div>
@@ -1067,6 +1592,10 @@ export default function AIWSDashboard() {
                   </div>
                 </div>
                 <div style={{ fontSize: '13px', color: '#94A3B8' }}>{lead.source}</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="action-btn edit" onClick={() => openEditModal('lead', lead)}>✏️</button>
+                  <button className="action-btn delete" onClick={() => handleDelete('lead', lead.id)}>🗑️</button>
+                </div>
               </div>
             ))}
           </div>
@@ -1079,12 +1608,12 @@ export default function AIWSDashboard() {
                 <PieChart>
                   <Pie
                     data={[
-                      { name: 'Referral', value: 2 },
-                      { name: 'Website', value: 1 },
-                      { name: 'Event', value: 1 },
-                      { name: 'LinkedIn', value: 1 },
-                      { name: 'Cold Call', value: 1 },
-                    ]}
+                      { name: 'Referral', value: leads.filter(l => l.source === 'Referral').length },
+                      { name: 'Website', value: leads.filter(l => l.source === 'Website').length },
+                      { name: 'Event', value: leads.filter(l => l.source === 'Event').length },
+                      { name: 'LinkedIn', value: leads.filter(l => l.source === 'LinkedIn').length },
+                      { name: 'Cold Call', value: leads.filter(l => l.source === 'Cold Call').length },
+                    ].filter(d => d.value > 0)}
                     cx="50%"
                     cy="50%"
                     innerRadius={40}
@@ -1114,11 +1643,13 @@ export default function AIWSDashboard() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '8px' }}>
                   <span>Avg Deal Size</span>
-                  <span style={{ fontWeight: '600', color: '#8B5CF6' }}>{formatCurrency(pipelineValue / (leadsData.length - 1))}</span>
+                  <span style={{ fontWeight: '600', color: '#8B5CF6' }}>{formatCurrency(leads.length > 0 ? pipelineValue / leads.filter(l => !['closed-won', 'closed-lost'].includes(l.stage)).length : 0)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px' }}>
                   <span>Win Rate</span>
-                  <span style={{ fontWeight: '600', color: '#3B82F6' }}>16.7%</span>
+                  <span style={{ fontWeight: '600', color: '#3B82F6' }}>
+                    {leads.length > 0 ? Math.round(leads.filter(l => l.stage === 'closed-won').length / leads.length * 100) : 0}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -1135,8 +1666,96 @@ export default function AIWSDashboard() {
         color: '#64748B',
         fontSize: '13px'
       }}>
-        © 2025 AI Workforce Solutions • Dashboard v1.0 • Built with ❤️ for Daniss
+        © 2025 AI Workforce Solutions • Dashboard v2.0 • Built with ❤️ for AIWS
       </div>
+
+      {/* Modals */}
+      <Modal 
+        isOpen={modalType === 'employee'} 
+        onClose={closeModal}
+        title={editingItem ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'}
+      >
+        {renderEmployeeForm()}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+          <button onClick={closeModal} style={{
+            padding: '10px 20px',
+            background: 'rgba(148, 163, 184, 0.2)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#F1F5F9',
+            cursor: 'pointer',
+            fontFamily: 'inherit'
+          }}>Hủy</button>
+          <button onClick={handleSave} style={{
+            padding: '10px 20px',
+            background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontWeight: '500'
+          }}>💾 Lưu</button>
+        </div>
+      </Modal>
+
+      <Modal 
+        isOpen={modalType === 'course'} 
+        onClose={closeModal}
+        title={editingItem ? 'Chỉnh sửa khóa học' : 'Thêm khóa học mới'}
+      >
+        {renderCourseForm()}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+          <button onClick={closeModal} style={{
+            padding: '10px 20px',
+            background: 'rgba(148, 163, 184, 0.2)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#F1F5F9',
+            cursor: 'pointer',
+            fontFamily: 'inherit'
+          }}>Hủy</button>
+          <button onClick={handleSave} style={{
+            padding: '10px 20px',
+            background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontWeight: '500'
+          }}>💾 Lưu</button>
+        </div>
+      </Modal>
+
+      <Modal 
+        isOpen={modalType === 'lead'} 
+        onClose={closeModal}
+        title={editingItem ? 'Chỉnh sửa Lead' : 'Thêm Lead mới'}
+      >
+        {renderLeadForm()}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+          <button onClick={closeModal} style={{
+            padding: '10px 20px',
+            background: 'rgba(148, 163, 184, 0.2)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#F1F5F9',
+            cursor: 'pointer',
+            fontFamily: 'inherit'
+          }}>Hủy</button>
+          <button onClick={handleSave} style={{
+            padding: '10px 20px',
+            background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontWeight: '500'
+          }}>💾 Lưu</button>
+        </div>
+      </Modal>
     </div>
   );
 }
