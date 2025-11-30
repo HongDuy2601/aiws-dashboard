@@ -25,44 +25,6 @@ export const getCurrentUser = async () => {
   return user;
 };
 
-// Get user role from user_profiles table
-export const getUserRole = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 'staff';
-  
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .single();
-  
-  if (error || !data) {
-    // If no profile exists, create one with default role
-    const { data: newProfile } = await supabase
-      .from('user_profiles')
-      .insert({ id: user.id, email: user.email, role: 'staff' })
-      .select()
-      .single();
-    return newProfile?.role || 'staff';
-  }
-  
-  return data.role || 'staff';
-};
-
-// Get user profile
-export const getUserProfile = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  
-  const { data } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-  
-  return data;
-};
-
 // Database helpers
 export const db = {
   employees: {
@@ -79,10 +41,7 @@ export const db = {
   },
   leads: {
     getAll: () => supabase.from('leads').select('*').order('id'),
-    create: async (data) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      return supabase.from('leads').insert({ ...data, created_by: user?.id }).select();
-    },
+    create: (data) => supabase.from('leads').insert(data).select(),
     update: (id, data) => supabase.from('leads').update(data).eq('id', id).select(),
     delete: (id) => supabase.from('leads').delete().eq('id', id),
   },
@@ -91,10 +50,9 @@ export const db = {
   },
   students: {
     getAll: () => supabase.from('students').select('*').order('id'),
-    create: async (data) => {
-      const { data: { user } } = await supabase.auth.getUser();
+    create: (data) => {
       const finalFee = (data.tuition_fee || 0) - (data.discount_amount || 0);
-      return supabase.from('students').insert({ ...data, final_fee: finalFee, created_by: user?.id }).select();
+      return supabase.from('students').insert({ ...data, final_fee: finalFee }).select();
     },
     update: (id, data) => {
       if (data.tuition_fee !== undefined || data.discount_amount !== undefined) {
@@ -103,9 +61,5 @@ export const db = {
       return supabase.from('students').update(data).eq('id', id).select();
     },
     delete: (id) => supabase.from('students').delete().eq('id', id),
-  },
-  userProfiles: {
-    getAll: () => supabase.from('user_profiles').select('*').order('created_at'),
-    update: (id, data) => supabase.from('user_profiles').update(data).eq('id', id).select(),
   },
 };
