@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import * as XLSX from 'xlsx';
-import { db } from './supabaseClient';
+import { db, getUserRole } from './supabaseClient';
 
 // Constants
 const COLORS = ['#0D9488', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899', '#10B981'];
@@ -72,6 +72,7 @@ const FormInput = ({ label, type = 'text', value, onChange, options, required, p
 
 // Main Dashboard Component
 export default function AIWSDashboard({ user, onLogout }) {
+  const [userRole, setUserRole] = useState('staff'); // 'admin' or 'staff'
   const [employees, setEmployees] = useState([]);
   const [courses, setCourses] = useState([]);
   const [leads, setLeads] = useState([]);
@@ -95,29 +96,44 @@ export default function AIWSDashboard({ user, onLogout }) {
   const [formData, setFormData] = useState({});
   const [viewStudent, setViewStudent] = useState(null);
 
-  // Fetch data
+  const isAdmin = userRole === 'admin';
+
+  // Fetch user role and data
   useEffect(() => {
-    fetchAllData();
+    const init = async () => {
+      const role = await getUserRole();
+      setUserRole(role);
+      await fetchAllData(role);
+    };
+    init();
   }, []);
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (role = userRole) => {
     setLoading(true);
     try {
-      const [empRes, courseRes, leadRes, studentRes, finRes] = await Promise.all([
-        db.employees.getAll(),
-        db.courses.getAll(),
-        db.leads.getAll(),
-        db.students.getAll(),
-        db.financial.getAll()
-      ]);
-      if (empRes.data) setEmployees(empRes.data);
+      // Courses - everyone can see
+      const courseRes = await db.courses.getAll();
       if (courseRes.data) setCourses(courseRes.data);
-      if (leadRes.data) setLeads(leadRes.data);
+
+      // Students - RLS will filter automatically
+      const studentRes = await db.students.getAll();
       if (studentRes.data) setStudents(studentRes.data);
-      if (finRes.data) {
-        const actual = finRes.data.filter(d => !d.is_forecast).map(d => ({ month: d.month, revenue: Number(d.revenue), expenses: Number(d.expenses), profit: Number(d.profit) }));
-        const forecast = finRes.data.filter(d => d.is_forecast).map(d => ({ month: d.month, revenue: Number(d.revenue), expenses: Number(d.expenses), profit: Number(d.profit) }));
-        setFinancialData({ actual, forecast });
+
+      // Leads - RLS will filter automatically
+      const leadRes = await db.leads.getAll();
+      if (leadRes.data) setLeads(leadRes.data);
+
+      // Admin only: Employees and Financial
+      if (role === 'admin') {
+        const empRes = await db.employees.getAll();
+        if (empRes.data) setEmployees(empRes.data);
+
+        const finRes = await db.financial.getAll();
+        if (finRes.data) {
+          const actual = finRes.data.filter(d => !d.is_forecast).map(d => ({ month: d.month, revenue: Number(d.revenue), expenses: Number(d.expenses), profit: Number(d.profit) }));
+          const forecast = finRes.data.filter(d => d.is_forecast).map(d => ({ month: d.month, revenue: Number(d.revenue), expenses: Number(d.expenses), profit: Number(d.profit) }));
+          setFinancialData({ actual, forecast });
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -134,7 +150,7 @@ export default function AIWSDashboard({ user, onLogout }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (modalType === 'employee') {
+      if (modalType === 'employee' && isAdmin) {
         const data = { name: formData.name, role: formData.role, department: formData.department, status: formData.status || 'active', workload: parseInt(formData.workload) || 0, performance: parseInt(formData.performance) || 0, salary: parseInt(formData.salary) || 0 };
         if (editingItem) await db.employees.update(editingItem.id, data);
         else await db.employees.create(data);
@@ -176,12 +192,13 @@ export default function AIWSDashboard({ user, onLogout }) {
   const handleDelete = async (type, id) => {
     if (!confirm('Bạn có chắc muốn xóa?')) return;
     try {
-      if (type === 'employee') { await db.employees.delete(id); setEmployees(employees.filter(e => e.id !== id)); }
+      if (type === 'employee' && isAdmin) { await db.employees.delete(id); setEmployees(employees.filter(e => e.id !== id)); }
       else if (type === 'course') { await db.courses.delete(id); setCourses(courses.filter(c => c.id !== id)); }
       else if (type === 'lead') { await db.leads.delete(id); setLeads(leads.filter(l => l.id !== id)); }
       else if (type === 'student') { await db.students.delete(id); setStudents(students.filter(s => s.id !== id)); }
     } catch (error) {
       console.error('Error deleting:', error);
+      alert('Lỗi: Bạn không có quyền xóa mục này');
     }
   };
 
@@ -194,6 +211,7 @@ export default function AIWSDashboard({ user, onLogout }) {
         fileName = 'AIWS_HocVien';
         break;
       case 'employees':
+        if (!isAdmin) return;
         data = employees.map(e => ({ 'Họ tên': e.name, 'Chức vụ': e.role, 'Phòng ban': e.department, 'Lương': e.salary }));
         fileName = 'AIWS_NhanSu';
         break;
@@ -252,14 +270,23 @@ export default function AIWSDashboard({ user, onLogout }) {
     });
   }, [leads]);
 
-  const tabs = [
-    { id: 'overview', label: 'Tổng quan', icon: '📊' },
-    { id: 'students', label: 'Học viên', icon: '🎓' },
-    { id: 'employees', label: 'Nhân sự', icon: '👥' },
-    { id: 'courses', label: 'Khóa học', icon: '📚' },
-    { id: 'finance', label: 'Tài chính', icon: '💰' },
-    { id: 'sales', label: 'Sales', icon: '🎯' },
-  ];
+  // Tabs based on role
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      { id: 'overview', label: 'Tổng quan', icon: '📊' },
+      { id: 'students', label: 'Học viên', icon: '🎓' },
+      { id: 'courses', label: 'Khóa học', icon: '📚' },
+      { id: 'sales', label: 'Sales', icon: '🎯' },
+    ];
+    
+    if (isAdmin) {
+      // Insert after overview
+      baseTabs.splice(2, 0, { id: 'employees', label: 'Nhân sự', icon: '👥' });
+      baseTabs.push({ id: 'finance', label: 'Tài chính', icon: '💰' });
+    }
+    
+    return baseTabs;
+  }, [isAdmin]);
 
   // Form renderers
   const renderEmployeeForm = () => (
@@ -369,6 +396,9 @@ export default function AIWSDashboard({ user, onLogout }) {
         .dropdown-menu { position: absolute; top: 100%; right: 0; margin-top: 8px; background: #1E293B; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 12px; padding: 8px; min-width: 200px; z-index: 100; }
         .dropdown-item { padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; }
         .dropdown-item:hover { background: rgba(148, 163, 184, 0.1); }
+        .role-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .role-admin { background: rgba(139, 92, 246, 0.2); color: #A78BFA; }
+        .role-staff { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
       `}</style>
 
       {/* Header */}
@@ -386,18 +416,21 @@ export default function AIWSDashboard({ user, onLogout }) {
             {showExportMenu && (
               <div className="dropdown-menu">
                 <div className="dropdown-item" onClick={() => exportToExcel('students')}>🎓 Học viên</div>
-                <div className="dropdown-item" onClick={() => exportToExcel('employees')}>👥 Nhân sự</div>
+                {isAdmin && <div className="dropdown-item" onClick={() => exportToExcel('employees')}>👥 Nhân sự</div>}
                 <div className="dropdown-item" onClick={() => exportToExcel('courses')}>📚 Khóa học</div>
                 <div className="dropdown-item" onClick={() => exportToExcel('leads')}>🎯 Leads</div>
               </div>
             )}
           </div>
-          <button onClick={() => { if (activeTab === 'students') openAddModal('student'); else if (activeTab === 'employees') openAddModal('employee'); else if (activeTab === 'courses') openAddModal('course'); else if (activeTab === 'sales') openAddModal('lead'); else openAddModal('student'); }} style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #0D9488, #0F766E)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>➕ Thêm mới</button>
+          <button onClick={() => { if (activeTab === 'students') openAddModal('student'); else if (activeTab === 'employees' && isAdmin) openAddModal('employee'); else if (activeTab === 'courses') openAddModal('course'); else if (activeTab === 'sales') openAddModal('lead'); else openAddModal('student'); }} style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #0D9488, #0F766E)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>➕ Thêm mới</button>
           <div style={{ position: 'relative' }}>
-            <button onClick={() => { setShowUserMenu(!showUserMenu); setShowExportMenu(false); }} style={{ padding: '10px 16px', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '10px', color: '#F1F5F9', fontSize: '14px', cursor: 'pointer' }}>👤 {user?.email?.split('@')[0]}</button>
+            <button onClick={() => { setShowUserMenu(!showUserMenu); setShowExportMenu(false); }} style={{ padding: '10px 16px', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '10px', color: '#F1F5F9', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              👤 {user?.email?.split('@')[0]}
+              <span className={`role-badge ${isAdmin ? 'role-admin' : 'role-staff'}`}>{isAdmin ? 'Admin' : 'Staff'}</span>
+            </button>
             {showUserMenu && (
               <div className="dropdown-menu">
-                <div className="dropdown-item" onClick={fetchAllData}>🔄 Refresh</div>
+                <div className="dropdown-item" onClick={() => fetchAllData(userRole)}>🔄 Refresh</div>
                 <div className="dropdown-item" onClick={onLogout} style={{ color: '#EF4444' }}>🚪 Đăng xuất</div>
               </div>
             )}
@@ -418,52 +451,89 @@ export default function AIWSDashboard({ user, onLogout }) {
       {activeTab === 'overview' && (
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-            <div className="kpi-card" style={{ '--accent-color': '#0D9488' }}>
-              <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Tổng doanh thu</p>
-              <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0 }}>{totalRevenue}M</h2>
-            </div>
+            {isAdmin && (
+              <div className="kpi-card" style={{ '--accent-color': '#0D9488' }}>
+                <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Tổng doanh thu</p>
+                <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0 }}>{totalRevenue}M</h2>
+              </div>
+            )}
             <div className="kpi-card" style={{ '--accent-color': '#3B82F6' }}>
-              <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Học viên</p>
+              <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Học viên {!isAdmin && '(của bạn)'}</p>
               <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0 }}>{students.length}</h2>
               <div style={{ color: '#94A3B8', fontSize: '13px', marginTop: '8px' }}>{students.filter(s => s.student_status === 'active').length} đang học</div>
             </div>
-            <div className="kpi-card" style={{ '--accent-color': '#10B981' }}>
-              <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Đã thu</p>
-              <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0, color: '#10B981' }}>{formatCurrency(studentStats.totalPaid)}</h2>
+            {isAdmin && (
+              <>
+                <div className="kpi-card" style={{ '--accent-color': '#10B981' }}>
+                  <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Đã thu</p>
+                  <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0, color: '#10B981' }}>{formatCurrency(studentStats.totalPaid)}</h2>
+                </div>
+                <div className="kpi-card" style={{ '--accent-color': '#EF4444' }}>
+                  <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Còn nợ</p>
+                  <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0, color: '#EF4444' }}>{formatCurrency(studentStats.totalRemaining)}</h2>
+                </div>
+              </>
+            )}
+            <div className="kpi-card" style={{ '--accent-color': '#8B5CF6' }}>
+              <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Khóa học</p>
+              <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0 }}>{courses.length}</h2>
+              <div style={{ color: '#94A3B8', fontSize: '13px', marginTop: '8px' }}>{courses.filter(c => c.status === 'active').length} đang mở</div>
             </div>
-            <div className="kpi-card" style={{ '--accent-color': '#EF4444' }}>
-              <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Còn nợ</p>
-              <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0, color: '#EF4444' }}>{formatCurrency(studentStats.totalRemaining)}</h2>
+            <div className="kpi-card" style={{ '--accent-color': '#F59E0B' }}>
+              <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Leads {!isAdmin && '(của bạn)'}</p>
+              <h2 style={{ fontSize: '32px', fontWeight: '700', margin: 0 }}>{leads.length}</h2>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-            <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>📈 Doanh thu (Triệu VNĐ)</h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={[...financialData.actual, ...financialData.forecast]}>
-                  <defs><linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0D9488" stopOpacity={0.4}/><stop offset="95%" stopColor="#0D9488" stopOpacity={0}/></linearGradient></defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                  <XAxis dataKey="month" stroke="#64748B" fontSize={12} />
-                  <YAxis stroke="#64748B" fontSize={12} />
-                  <Tooltip contentStyle={{ background: '#1E293B', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '8px' }} />
-                  <Area type="monotone" dataKey="revenue" stroke="#0D9488" strokeWidth={2} fill="url(#colorRevenue)" />
-                </AreaChart>
-              </ResponsiveContainer>
+          {isAdmin && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
+              <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>📈 Doanh thu (Triệu VNĐ)</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={[...financialData.actual, ...financialData.forecast]}>
+                    <defs><linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0D9488" stopOpacity={0.4}/><stop offset="95%" stopColor="#0D9488" stopOpacity={0}/></linearGradient></defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
+                    <XAxis dataKey="month" stroke="#64748B" fontSize={12} />
+                    <YAxis stroke="#64748B" fontSize={12} />
+                    <Tooltip contentStyle={{ background: '#1E293B', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '8px' }} />
+                    <Area type="monotone" dataKey="revenue" stroke="#0D9488" strokeWidth={2} fill="url(#colorRevenue)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>📊 Phân bổ nhân sự</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie data={departmentDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" label>
+                      {departmentDistribution.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+          )}
+
+          {!isAdmin && (
             <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>📊 Phân bổ nhân sự</h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie data={departmentDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" label>
-                    {departmentDistribution.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>📊 Thống kê của bạn</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+                <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(13, 148, 136, 0.1)', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#0D9488' }}>{students.length}</div>
+                  <div style={{ fontSize: '13px', color: '#94A3B8' }}>Học viên</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#3B82F6' }}>{leads.length}</div>
+                  <div style={{ fontSize: '13px', color: '#94A3B8' }}>Leads</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#10B981' }}>{leads.filter(l => l.stage === 'closed-won').length}</div>
+                  <div style={{ fontSize: '13px', color: '#94A3B8' }}>Deals Won</div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -471,16 +541,18 @@ export default function AIWSDashboard({ user, onLogout }) {
       {activeTab === 'students' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>🎓 Quản lý Học viên ({students.length})</h3>
+            <h3 style={{ margin: 0, fontSize: '18px' }}>🎓 Quản lý Học viên {!isAdmin && '(của bạn)'} ({students.length})</h3>
             <button onClick={() => openAddModal('student')} style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #0D9488, #0F766E)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', cursor: 'pointer' }}>➕ Thêm học viên</button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-            <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#0D9488' }}>{students.length}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Tổng</div></div>
-            <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#3B82F6' }}>{students.filter(s => s.student_status === 'active').length}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Đang học</div></div>
-            <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#10B981' }}>{formatCurrency(studentStats.totalPaid)}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Đã thu</div></div>
-            <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#EF4444' }}>{formatCurrency(studentStats.totalRemaining)}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Còn nợ</div></div>
-          </div>
+          {isAdmin && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#0D9488' }}>{students.length}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Tổng</div></div>
+              <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#3B82F6' }}>{students.filter(s => s.student_status === 'active').length}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Đang học</div></div>
+              <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#10B981' }}>{formatCurrency(studentStats.totalPaid)}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Đã thu</div></div>
+              <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}><div style={{ fontSize: '28px', fontWeight: '700', color: '#EF4444' }}>{formatCurrency(studentStats.totalRemaining)}</div><div style={{ fontSize: '13px', color: '#94A3B8' }}>Còn nợ</div></div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <input type="text" placeholder="🔍 Tìm kiếm..." value={searchStudent} onChange={e => setSearchStudent(e.target.value)} style={{ padding: '10px 16px', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '10px', color: '#F1F5F9', fontSize: '14px', outline: 'none', minWidth: '200px' }} />
@@ -519,12 +591,17 @@ export default function AIWSDashboard({ user, onLogout }) {
                 </div>
               </div>
             ))}
+            {filteredStudents.length === 0 && (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
+                {isAdmin ? 'Không có học viên nào' : 'Bạn chưa có học viên nào. Thêm học viên mới để bắt đầu!'}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* EMPLOYEES TAB */}
-      {activeTab === 'employees' && (
+      {/* EMPLOYEES TAB - Admin Only */}
+      {activeTab === 'employees' && isAdmin && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={{ margin: 0, fontSize: '18px' }}>👥 Quản lý Nhân sự ({employees.length})</h3>
@@ -576,7 +653,7 @@ export default function AIWSDashboard({ user, onLogout }) {
                 <option value="upcoming">Sắp tới</option>
                 <option value="completed">Hoàn thành</option>
               </select>
-              <button onClick={() => openAddModal('course')} style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #0D9488, #0F766E)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', cursor: 'pointer' }}>➕ Thêm</button>
+              {isAdmin && <button onClick={() => openAddModal('course')} style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #0D9488, #0F766E)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', cursor: 'pointer' }}>➕ Thêm</button>}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
@@ -588,14 +665,16 @@ export default function AIWSDashboard({ user, onLogout }) {
                     <h4 style={{ margin: '8px 0 4px 0', fontSize: '16px' }}>{course.name}</h4>
                     <p style={{ margin: 0, fontSize: '13px', color: '#94A3B8' }}>👤 {course.instructor}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="action-btn edit" onClick={() => openEditModal('course', course)}>✏️</button>
-                    <button className="action-btn delete" onClick={() => handleDelete('course', course.id)}>🗑️</button>
-                  </div>
+                  {isAdmin && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="action-btn edit" onClick={() => openEditModal('course', course)}>✏️</button>
+                      <button className="action-btn delete" onClick={() => handleDelete('course', course.id)}>🗑️</button>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div><div style={{ fontSize: '12px', color: '#94A3B8' }}>Học viên</div><div style={{ fontSize: '18px', fontWeight: '600' }}>{course.students}</div></div>
-                  <div><div style={{ fontSize: '12px', color: '#94A3B8' }}>Doanh thu</div><div style={{ fontSize: '18px', fontWeight: '600', color: '#10B981' }}>{formatCurrency(course.revenue)}</div></div>
+                  {isAdmin && <div><div style={{ fontSize: '12px', color: '#94A3B8' }}>Doanh thu</div><div style={{ fontSize: '18px', fontWeight: '600', color: '#10B981' }}>{formatCurrency(course.revenue)}</div></div>}
                 </div>
                 <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}><span style={{ fontSize: '13px', color: '#94A3B8' }}>Tiến độ</span><span style={{ fontSize: '13px', fontWeight: '500' }}>{course.progress}%</span></div><div className="progress-bar"><div className="progress-fill" style={{ width: `${course.progress}%`, background: `linear-gradient(90deg, ${COLORS[index % COLORS.length]}, ${COLORS[(index + 1) % COLORS.length]})` }}></div></div></div>
               </div>
@@ -604,8 +683,8 @@ export default function AIWSDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/* FINANCE TAB */}
-      {activeTab === 'finance' && (
+      {/* FINANCE TAB - Admin Only */}
+      {activeTab === 'finance' && isAdmin && (
         <div>
           <h3 style={{ margin: '0 0 20px 0', fontSize: '18px' }}>💰 Tài chính</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
@@ -635,7 +714,7 @@ export default function AIWSDashboard({ user, onLogout }) {
       {activeTab === 'sales' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>🎯 Sales Pipeline ({leads.length} leads)</h3>
+            <h3 style={{ margin: 0, fontSize: '18px' }}>🎯 Sales Pipeline {!isAdmin && '(của bạn)'} ({leads.length} leads)</h3>
             <div style={{ display: 'flex', gap: '12px' }}>
               <select className="filter-select" value={filterStage} onChange={e => setFilterStage(e.target.value)}>
                 <option value="all">Tất cả</option>
@@ -654,20 +733,20 @@ export default function AIWSDashboard({ user, onLogout }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '600px', margin: '0 auto' }}>
               {pipelineStages.map((stage, index) => {
                 const width = 100 - (index * 15);
-                return (<div key={stage.key} style={{ width: `${width}%`, margin: '0 auto', padding: '12px 20px', background: `linear-gradient(90deg, ${COLORS[index]}dd, ${COLORS[index]}88)`, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', color: 'white', fontWeight: '500' }}><span>{stage.name}</span><span>{stage.deals} deals • {stage.amount}M</span></div>);
+                return (<div key={stage.key} style={{ width: `${width}%`, margin: '0 auto', padding: '12px 20px', background: `linear-gradient(90deg, ${COLORS[index]}dd, ${COLORS[index]}88)`, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', color: 'white', fontWeight: '500' }}><span>{stage.name}</span><span>{stage.deals} deals {isAdmin && `• ${stage.amount}M`}</span></div>);
               })}
             </div>
           </div>
 
           <div className="glass-card" style={{ overflow: 'hidden' }}>
-            <div className="table-row" style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 100px', background: 'rgba(15, 23, 42, 0.5)', fontWeight: '600', fontSize: '13px', color: '#94A3B8' }}>
-              <div>Công ty</div><div>Liên hệ</div><div>Giá trị</div><div>Giai đoạn</div><div>Xác suất</div><div>Thao tác</div>
+            <div className="table-row" style={{ gridTemplateColumns: isAdmin ? '2fr 1.5fr 1fr 1fr 1fr 100px' : '2fr 1.5fr 1fr 1fr 100px', background: 'rgba(15, 23, 42, 0.5)', fontWeight: '600', fontSize: '13px', color: '#94A3B8' }}>
+              <div>Công ty</div><div>Liên hệ</div>{isAdmin && <div>Giá trị</div>}<div>Giai đoạn</div><div>Xác suất</div><div>Thao tác</div>
             </div>
             {filteredLeads.map(lead => (
-              <div key={lead.id} className="table-row" style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 100px' }}>
+              <div key={lead.id} className="table-row" style={{ gridTemplateColumns: isAdmin ? '2fr 1.5fr 1fr 1fr 1fr 100px' : '2fr 1.5fr 1fr 1fr 100px' }}>
                 <div style={{ fontWeight: '500' }}>{lead.company}</div>
                 <div><div>{lead.contact}</div><div style={{ fontSize: '12px', color: '#64748B' }}>{lead.email}</div></div>
-                <div style={{ fontWeight: '600', color: '#10B981' }}>{formatCurrency(lead.value)}</div>
+                {isAdmin && <div style={{ fontWeight: '600', color: '#10B981' }}>{formatCurrency(lead.value)}</div>}
                 <div><span className="status-badge" style={{ background: `${STAGE_COLORS[lead.stage]}22`, color: STAGE_COLORS[lead.stage] }}>{getStageLabel(lead.stage)}</span></div>
                 <div>{lead.probability}%</div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -676,17 +755,22 @@ export default function AIWSDashboard({ user, onLogout }) {
                 </div>
               </div>
             ))}
+            {filteredLeads.length === 0 && (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
+                {isAdmin ? 'Không có lead nào' : 'Bạn chưa có lead nào. Thêm lead mới để bắt đầu!'}
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Footer */}
       <div style={{ marginTop: '40px', padding: '20px', textAlign: 'center', borderTop: '1px solid rgba(148, 163, 184, 0.1)', color: '#64748B', fontSize: '13px' }}>
-        © 2025 AI Workforce Solutions • Dashboard v3.0 with Supabase
+        © 2025 AI Workforce Solutions • Dashboard v3.0 with Role-Based Access
       </div>
 
       {/* Modals */}
-      <Modal isOpen={modalType === 'employee'} onClose={closeModal} title={editingItem ? 'Sửa nhân viên' : 'Thêm nhân viên'}>
+      <Modal isOpen={modalType === 'employee' && isAdmin} onClose={closeModal} title={editingItem ? 'Sửa nhân viên' : 'Thêm nhân viên'}>
         {renderEmployeeForm()}
         <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
           <button onClick={closeModal} style={{ padding: '10px 20px', background: 'rgba(148, 163, 184, 0.2)', border: 'none', borderRadius: '8px', color: '#F1F5F9', cursor: 'pointer' }}>Hủy</button>
