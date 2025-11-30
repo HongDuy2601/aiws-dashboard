@@ -1,25 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-// ⚠️ THAY THẾ BẰNG CREDENTIALS CỦA BẠN
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'YOUR_SUPABASE_URL';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables!');
+}
+
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
 // Auth helpers
 export const signIn = async (email, password) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  return { data, error };
-};
-
-export const signUp = async (email, password) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   return { data, error };
 };
 
@@ -37,281 +29,74 @@ export const getCurrentUser = async () => {
 export const db = {
   // Employees
   employees: {
-    getAll: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .order('id', { ascending: true });
-      return { data, error };
-    },
-    create: async (employee) => {
-      const { data, error } = await supabase
-        .from('employees')
-        .insert([employee])
-        .select()
-        .single();
-      return { data, error };
-    },
-    update: async (id, updates) => {
-      const { data, error } = await supabase
-        .from('employees')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
-    },
-    delete: async (id) => {
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', id);
-      return { error };
-    },
+    getAll: () => supabase.from('employees').select('*').order('id'),
+    getById: (id) => supabase.from('employees').select('*').eq('id', id).single(),
+    create: (data) => supabase.from('employees').insert(data).select(),
+    update: (id, data) => supabase.from('employees').update(data).eq('id', id).select(),
+    delete: (id) => supabase.from('employees').delete().eq('id', id),
   },
 
   // Courses
   courses: {
-    getAll: async () => {
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .order('id', { ascending: true });
-      return { data, error };
-    },
-    create: async (course) => {
-      const { data, error } = await supabase
-        .from('courses')
-        .insert([course])
-        .select()
-        .single();
-      return { data, error };
-    },
-    update: async (id, updates) => {
-      const { data, error } = await supabase
-        .from('courses')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
-    },
-    delete: async (id) => {
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', id);
-      return { error };
-    },
+    getAll: () => supabase.from('courses').select('*').order('id'),
+    getById: (id) => supabase.from('courses').select('*').eq('id', id).single(),
+    create: (data) => supabase.from('courses').insert(data).select(),
+    update: (id, data) => supabase.from('courses').update(data).eq('id', id).select(),
+    delete: (id) => supabase.from('courses').delete().eq('id', id),
   },
 
   // Leads
   leads: {
-    getAll: async () => {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .order('id', { ascending: true });
-      return { data, error };
-    },
-    create: async (lead) => {
-      const { data, error } = await supabase
-        .from('leads')
-        .insert([lead])
-        .select()
-        .single();
-      return { data, error };
-    },
-    update: async (id, updates) => {
-      const { data, error } = await supabase
-        .from('leads')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
-    },
-    delete: async (id) => {
-      const { error } = await supabase
-        .from('leads')
-        .delete()
-        .eq('id', id);
-      return { error };
-    },
+    getAll: () => supabase.from('leads').select('*').order('id'),
+    getById: (id) => supabase.from('leads').select('*').eq('id', id).single(),
+    create: (data) => supabase.from('leads').insert(data).select(),
+    update: (id, data) => supabase.from('leads').update(data).eq('id', id).select(),
+    delete: (id) => supabase.from('leads').delete().eq('id', id),
   },
 
-  // Students - NEW
+  // Financial
+  financial: {
+    getAll: () => supabase.from('financial_data').select('*').order('id'),
+    create: (data) => supabase.from('financial_data').insert(data).select(),
+  },
+
+  // Students
   students: {
-    getAll: async () => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('created_at', { ascending: false });
-      return { data, error };
-    },
-    getById: async (id) => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('id', id)
-        .single();
-      return { data, error };
-    },
-    getByCourse: async (courseId) => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('course_id', courseId)
-        .order('full_name', { ascending: true });
-      return { data, error };
-    },
-    getByStatus: async (status) => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('student_status', status)
-        .order('created_at', { ascending: false });
-      return { data, error };
-    },
-    getByPaymentStatus: async (paymentStatus) => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('payment_status', paymentStatus)
-        .order('created_at', { ascending: false });
-      return { data, error };
-    },
+    getAll: () => supabase.from('students').select('*').order('id'),
+    getById: (id) => supabase.from('students').select('*').eq('id', id).single(),
+    getByCourse: (courseId) => supabase.from('students').select('*').eq('course_id', courseId),
+    getByStatus: (status) => supabase.from('students').select('*').eq('student_status', status),
+    getByPaymentStatus: (status) => supabase.from('students').select('*').eq('payment_status', status),
     create: async (student) => {
-      // Calculate final_fee if not provided
-      if (!student.final_fee && student.tuition_fee) {
-        student.final_fee = student.tuition_fee - (student.discount_amount || 0);
-      }
-      const { data, error } = await supabase
-        .from('students')
-        .insert([student])
-        .select()
-        .single();
-      return { data, error };
+      const finalFee = (student.tuition_fee || 0) - (student.discount_amount || 0);
+      const data = { ...student, final_fee: finalFee };
+      return supabase.from('students').insert(data).select();
     },
     update: async (id, updates) => {
-      // Recalculate final_fee if tuition or discount changed
       if (updates.tuition_fee !== undefined || updates.discount_amount !== undefined) {
-        const tuition = updates.tuition_fee || 0;
-        const discount = updates.discount_amount || 0;
+        const tuition = updates.tuition_fee ?? 0;
+        const discount = updates.discount_amount ?? 0;
         updates.final_fee = tuition - discount;
       }
-      const { data, error } = await supabase
-        .from('students')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
+      return supabase.from('students').update(updates).eq('id', id).select();
     },
-    delete: async (id) => {
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', id);
-      return { error };
-    },
-    // Statistics
-    getStats: async () => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('student_status, payment_status, tuition_fee, paid_amount, remaining_amount');
-      
-      if (error) return { data: null, error };
-      
-      const stats = {
-        total: data.length,
-        active: data.filter(s => s.student_status === 'active').length,
-        completed: data.filter(s => s.student_status === 'completed').length,
-        dropped: data.filter(s => s.student_status === 'dropped').length,
-        totalTuition: data.reduce((sum, s) => sum + (s.tuition_fee || 0), 0),
-        totalPaid: data.reduce((sum, s) => sum + (s.paid_amount || 0), 0),
-        totalRemaining: data.reduce((sum, s) => sum + (s.remaining_amount || 0), 0),
-        paidFull: data.filter(s => s.payment_status === 'paid').length,
-        paidPartial: data.filter(s => s.payment_status === 'partial').length,
-        unpaid: data.filter(s => s.payment_status === 'unpaid').length,
-      };
-      
-      return { data: stats, error: null };
-    },
+    delete: (id) => supabase.from('students').delete().eq('id', id),
   },
 
-  // Payment History - NEW
+  // Payment History
   paymentHistory: {
-    getByStudent: async (studentId) => {
-      const { data, error } = await supabase
-        .from('payment_history')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('payment_date', { ascending: false });
-      return { data, error };
-    },
+    getByStudent: (studentId) => supabase.from('payment_history').select('*').eq('student_id', studentId).order('payment_date', { ascending: false }),
     create: async (payment) => {
-      const { data, error } = await supabase
-        .from('payment_history')
-        .insert([payment])
-        .select()
-        .single();
-      
-      // Update student paid_amount
-      if (!error && data) {
-        const { data: student } = await supabase
-          .from('students')
-          .select('paid_amount')
-          .eq('id', payment.student_id)
-          .single();
-        
+      const result = await supabase.from('payment_history').insert(payment).select();
+      if (!result.error && payment.student_id) {
+        const { data: student } = await db.students.getById(payment.student_id);
         if (student) {
-          await supabase
-            .from('students')
-            .update({ paid_amount: (student.paid_amount || 0) + payment.amount })
-            .eq('id', payment.student_id);
+          const newPaidAmount = (student.paid_amount || 0) + payment.amount;
+          await db.students.update(payment.student_id, { paid_amount: newPaidAmount });
         }
       }
-      
-      return { data, error };
+      return result;
     },
-    delete: async (id) => {
-      const { error } = await supabase
-        .from('payment_history')
-        .delete()
-        .eq('id', id);
-      return { error };
-    },
+    delete: (id) => supabase.from('payment_history').delete().eq('id', id),
   },
-
-  // Financial Data
-  financial: {
-    getAll: async () => {
-      const { data, error } = await supabase
-        .from('financial_data')
-        .select('*')
-        .order('id', { ascending: true });
-      return { data, error };
-    },
-  },
-};
-
-// Realtime subscriptions
-export const subscribeToTable = (table, callback) => {
-  const subscription = supabase
-    .channel(`${table}_changes`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: table },
-      (payload) => {
-        callback(payload);
-      }
-    )
-    .subscribe();
-  
-  return subscription;
-};
-
-export const unsubscribe = (subscription) => {
-  supabase.removeChannel(subscription);
 };

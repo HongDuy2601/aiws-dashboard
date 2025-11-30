@@ -1,37 +1,26 @@
 import React, { useState } from 'react';
-import { signIn, signUp } from './supabaseClient';
+import { signIn } from './supabaseClient';
 
 export default function LoginPage({ onLogin }) {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setMessage('');
 
-    try {
-      if (isLogin) {
-        const { data, error } = await signIn(email, password);
-        if (error) throw error;
-        if (data.user) {
-          onLogin(data.user);
-        }
-      } else {
-        const { data, error } = await signUp(email, password);
-        if (error) throw error;
-        setMessage('Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản.');
-        setIsLogin(true);
-      }
-    } catch (err) {
-      setError(err.message || 'Có lỗi xảy ra');
-    } finally {
+    const { data, error } = await signIn(email, password);
+    
+    if (error) {
+      setError(error.message === 'Invalid login credentials' 
+        ? 'Email hoặc mật khẩu không đúng' 
+        : error.message);
       setLoading(false);
+    } else if (data?.user) {
+      onLogin(data.user);
     }
   };
 
@@ -43,7 +32,7 @@ export default function LoginPage({ onLogin }) {
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: '"DM Sans", system-ui, sans-serif',
-      padding: '20px',
+      padding: '20px'
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
@@ -57,19 +46,21 @@ export default function LoginPage({ onLogin }) {
         padding: '48px',
         width: '100%',
         maxWidth: '420px',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{
-            width: '64px',
-            height: '64px',
+            width: '72px',
+            height: '72px',
             background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
-            borderRadius: '16px',
+            borderRadius: '20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '32px',
-            margin: '0 auto 16px'
+            fontSize: '36px',
+            margin: '0 auto 16px',
+            boxShadow: '0 10px 40px rgba(13, 148, 136, 0.3)'
           }}>
             🤖
           </div>
@@ -77,7 +68,9 @@ export default function LoginPage({ onLogin }) {
             fontSize: '24px',
             fontFamily: '"Space Grotesk", sans-serif',
             fontWeight: '700',
-            color: '#F1F5F9',
+            background: 'linear-gradient(135deg, #F1F5F9 0%, #94A3B8 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
             margin: '0 0 8px 0'
           }}>
             AI Workforce Solutions
@@ -87,52 +80,6 @@ export default function LoginPage({ onLogin }) {
           </p>
         </div>
 
-        {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          background: 'rgba(15, 23, 42, 0.5)',
-          borderRadius: '12px',
-          padding: '4px',
-          marginBottom: '24px'
-        }}>
-          <button
-            onClick={() => setIsLogin(true)}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              borderRadius: '10px',
-              background: isLogin ? 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)' : 'transparent',
-              color: isLogin ? 'white' : '#94A3B8',
-              fontFamily: 'inherit',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            Đăng nhập
-          </button>
-          <button
-            onClick={() => setIsLogin(false)}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              borderRadius: '10px',
-              background: !isLogin ? 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)' : 'transparent',
-              color: !isLogin ? 'white' : '#94A3B8',
-              fontFamily: 'inherit',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            Đăng ký
-          </button>
-        </div>
-
         {/* Form */}
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
@@ -140,7 +87,8 @@ export default function LoginPage({ onLogin }) {
               display: 'block',
               marginBottom: '8px',
               fontSize: '14px',
-              color: '#94A3B8'
+              color: '#94A3B8',
+              fontWeight: '500'
             }}>
               Email
             </label>
@@ -149,17 +97,17 @@ export default function LoginPage({ onLogin }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="name@company.com"
+              placeholder="your@email.com"
               style={{
                 width: '100%',
                 padding: '14px 16px',
-                background: 'rgba(15, 23, 42, 0.5)',
+                background: 'rgba(15, 23, 42, 0.8)',
                 border: '1px solid rgba(148, 163, 184, 0.2)',
                 borderRadius: '12px',
                 color: '#F1F5F9',
-                fontSize: '14px',
+                fontSize: '15px',
                 outline: 'none',
-                transition: 'border-color 0.2s',
+                transition: 'border-color 0.2s ease',
                 boxSizing: 'border-box'
               }}
               onFocus={(e) => e.target.style.borderColor = '#0D9488'}
@@ -172,7 +120,8 @@ export default function LoginPage({ onLogin }) {
               display: 'block',
               marginBottom: '8px',
               fontSize: '14px',
-              color: '#94A3B8'
+              color: '#94A3B8',
+              fontWeight: '500'
             }}>
               Mật khẩu
             </label>
@@ -182,17 +131,16 @@ export default function LoginPage({ onLogin }) {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="••••••••"
-              minLength={6}
               style={{
                 width: '100%',
                 padding: '14px 16px',
-                background: 'rgba(15, 23, 42, 0.5)',
+                background: 'rgba(15, 23, 42, 0.8)',
                 border: '1px solid rgba(148, 163, 184, 0.2)',
                 borderRadius: '12px',
                 color: '#F1F5F9',
-                fontSize: '14px',
+                fontSize: '15px',
                 outline: 'none',
-                transition: 'border-color 0.2s',
+                transition: 'border-color 0.2s ease',
                 boxSizing: 'border-box'
               }}
               onFocus={(e) => e.target.style.borderColor = '#0D9488'}
@@ -202,29 +150,18 @@ export default function LoginPage({ onLogin }) {
 
           {error && (
             <div style={{
-              padding: '12px 16px',
               background: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid rgba(239, 68, 68, 0.3)',
               borderRadius: '10px',
+              padding: '12px 16px',
+              marginBottom: '20px',
               color: '#EF4444',
               fontSize: '14px',
-              marginBottom: '20px'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}>
               ⚠️ {error}
-            </div>
-          )}
-
-          {message && (
-            <div style={{
-              padding: '12px 16px',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '10px',
-              color: '#10B981',
-              fontSize: '14px',
-              marginBottom: '20px'
-            }}>
-              ✅ {message}
             </div>
           )}
 
@@ -235,56 +172,36 @@ export default function LoginPage({ onLogin }) {
               width: '100%',
               padding: '14px',
               background: loading 
-                ? 'rgba(148, 163, 184, 0.3)' 
+                ? 'rgba(13, 148, 136, 0.5)' 
                 : 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
               border: 'none',
               borderRadius: '12px',
               color: 'white',
-              fontSize: '16px',
+              fontSize: '15px',
               fontWeight: '600',
-              fontFamily: 'inherit',
               cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+              fontFamily: 'inherit',
+              boxShadow: '0 4px 20px rgba(13, 148, 136, 0.3)'
             }}
+            onMouseOver={(e) => !loading && (e.target.style.transform = 'translateY(-2px)')}
+            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
           >
-            {loading ? (
-              <>
-                <span style={{
-                  width: '20px',
-                  height: '20px',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  borderTopColor: 'white',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }}></span>
-                Đang xử lý...
-              </>
-            ) : (
-              isLogin ? '🔐 Đăng nhập' : '✨ Đăng ký'
-            )}
+            {loading ? '⏳ Đang đăng nhập...' : '🔐 Đăng nhập'}
           </button>
         </form>
 
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-
         {/* Footer */}
-        <p style={{
-          textAlign: 'center',
-          color: '#64748B',
-          fontSize: '13px',
-          marginTop: '24px',
-          marginBottom: 0
+        <div style={{
+          marginTop: '32px',
+          paddingTop: '24px',
+          borderTop: '1px solid rgba(148, 163, 184, 0.1)',
+          textAlign: 'center'
         }}>
-          © 2025 AI Workforce Solutions
-        </p>
+          <p style={{ color: '#64748B', fontSize: '13px', margin: 0 }}>
+            © 2025 AI Workforce Solutions
+          </p>
+        </div>
       </div>
     </div>
   );
